@@ -1,0 +1,66 @@
+---
+title: "bigrams"
+author: "Nick Rhodes"
+date: "29 May 2019"
+output: html_document
+---
+
+```{r set-options, echo=FALSE, cache=TRUE}
+options(width = 1200)
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(tidytext)
+library(plotly)
+works <- readRDS("dickens.RDS")
+```
+
+# Analysing the works of Dickens
+
+## 1. Bigrams
+
+Visualising books by tf-idf for word pairs.
+
+```{r frequency, echo=FALSE}
+bigrams <- works %>%
+  unnest_tokens(bigram, text, token = "ngrams", n = 2)
+
+bigrams_separated <- bigrams %>%
+  separate(bigram, c("word1", "word2"), sep = " ")
+
+bigrams_filtered <- bigrams_separated %>%
+  filter(!word1 %in% stop_words$word) %>%
+  filter(!word2 %in% stop_words$word)
+
+# new bigram counts:
+bigram_counts <- bigrams_filtered %>% 
+  count(word1, word2, sort = TRUE)
+
+bigrams_united <- bigrams_filtered %>%
+  unite(bigram, word1, word2, sep = " ")
+
+bigram_tf_idf <- bigrams_united %>%
+  count(title, bigram) %>%
+  bind_tf_idf(bigram, title, n) %>%
+  arrange(desc(tf_idf))
+
+g <- bigram_tf_idf %>%
+  arrange(desc(tf_idf)) %>%
+  mutate(bigram = factor(bigram, levels = rev(unique(bigram)))) %>% 
+  group_by(title) %>% 
+  top_n(10) %>% 
+  ungroup() %>%
+  ggplot(aes(bigram,
+             tf_idf, 
+             fill = title,
+             size = 1)) +
+  geom_col(show.legend = FALSE) +
+  labs(x = NULL, y = "tf-idf") +
+  facet_wrap(~title, ncol = 3, scales = "free") +
+  coord_flip()
+ggplotly(g, width = 1200, height = 1000) %>% 
+  layout(showlegend = F)
+```
+
